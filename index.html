@@ -540,7 +540,7 @@ modelFit.knn</code></pre>
 ## Detection Rate         0.2844   0.1935   0.1744   0.1639   0.1838
 ## Detection Prevalence   0.2844   0.1935   0.1744   0.1639   0.1838
 ## Balanced Accuracy      1.0000   1.0000   1.0000   1.0000   1.0000</code></pre>
-<p>The best model has k = 1 and an accuracy of ~ 0.9940. This predicts the entire training data set perfectly, albeit with the risk of the model being overfit.</p>
+<p>The best model has k = 1 and an accuracy of ~ 0.9940. This predicts the entire training data set perfectly, albeit with the risk of the model being overfit. As training was done using cross validation, 0.9940 is the estimate for the out of sample error.</p>
 </div>
 <div id="decision-tree" class="section level3">
 <h3>Decision tree</h3>
@@ -610,7 +610,7 @@ text(modelFit.rpart$finalModel,
 ## Detection Rate         0.2589  0.06554  0.08801   0.0000  0.08312
 ## Detection Prevalence   0.2844  0.19351  0.17440   0.1639  0.18382
 ## Balanced Accuracy      0.7219  0.68080  0.60633       NA  0.94079</code></pre>
-<p>The decision tree does poorly. It never predicts a classe of D and has an accuracy of ~ 0.5057.</p>
+<p>The decision tree does poorly. It never predicts a classe of D and has an accuracy of ~ 0.5057. As training was done using cross validation, 0.5057 is the estimate for the out of sample error.</p>
 </div>
 <div id="random-forest" class="section level3">
 <h3>Random forest</h3>
@@ -677,7 +677,7 @@ modelFit.rf</code></pre>
 ## Detection Rate         0.2844   0.1935   0.1744   0.1639   0.1838
 ## Detection Prevalence   0.2844   0.1935   0.1744   0.1639   0.1838
 ## Balanced Accuracy      1.0000   1.0000   1.0000   1.0000   1.0000</code></pre>
-<p>Random forest does better than k-NN. Accuracy is 0.9955 and it also predicts the entire training set perfectly.</p>
+<p>Random forest does better than k-NN. Accuracy is 0.9955 and it also predicts the entire training set perfectly. As training was done using cross validation, 0.9955 is the estimate for the out of sample error.</p>
 </div>
 </div>
 <div id="selecting-a-model-for-prediction" class="section level2">

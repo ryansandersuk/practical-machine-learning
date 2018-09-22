@@ -103,7 +103,7 @@ For every model I plan to use ten-fold cross validation. For model evaluation, I
 
 Starting with k-NN, the summary of the data above shows a wide range of values for different predictors. As k-NN uses distance between predictors I'm centering and scaling the predictors so they are consistent. I'm going to consider k set from 1 to 10 inclusive to see what works best; potentially will need to consider larger values of k in a second iteration.
 
-```{r knn}
+```{r knn, cache = TRUE}
 set.seed(123)
 trControl <- trainControl(method = "cv", number = 10)
 modelFit.knn <-
@@ -122,11 +122,11 @@ confusionMatrix(subset.data.training$classe,
                 predict(modelFit.knn, subset.data.training))
 ```
 
-The best model has k = 1 and an accuracy of ~ 0.9940. This predicts the entire training data set perfectly, albeit with the risk of the model being overfit.
+The best model has k = 1 and an accuracy of ~ 0.9940. This predicts the entire training data set perfectly, albeit with the risk of the model being overfit. As training was done using cross validation, 0.9940 is the estimate for the out of sample error.
 
 ### Decision tree
 
-```{r decision-tree}
+```{r decision-tree, cache = TRUE}
 set.seed(123)
 modelFit.rpart <-
     train(classe ~ .,
@@ -145,11 +145,11 @@ confusionMatrix(subset.data.training$classe,
                 predict(modelFit.rpart, subset.data.training))
 ```
 
-The decision tree does poorly. It never predicts a classe of D and has an accuracy of ~ 0.5057.
+The decision tree does poorly. It never predicts a classe of D and has an accuracy of ~ 0.5057. As training was done using cross validation, 0.5057 is the estimate for the out of sample error.
 
 ### Random forest
 
-```{r random-forest}
+```{r random-forest, cache = TRUE}
 set.seed(123)
 modelFit.rf <-
     train(classe ~ .,
@@ -164,7 +164,7 @@ confusionMatrix(subset.data.training$classe,
                 predict(modelFit.rf, subset.data.training))
 ```
 
-Random forest does better than k-NN. Accuracy is 0.9955 and it also predicts the entire training set perfectly.
+Random forest does better than k-NN. Accuracy is 0.9955 and it also predicts the entire training set perfectly. As training was done using cross validation, 0.9955 is the estimate for the out of sample error.
 
 ## Selecting a model for prediction
 
