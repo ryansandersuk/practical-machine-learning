@@ -7,24 +7,193 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(caret)
 ```
 
-## R Markdown
+## Getting the data
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+First let's download the training and testing datasets, if they haven't been downloaded already.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r get-training-data}
+# Check directory doesn't exist and create if not
+if (!file.exists("data")) {
+    dir.create("data")
+}
 
-```{r cars}
-summary(cars)
+if (!file.exists("data/pml-training.csv")) {
+    fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+    download.file(fileUrl, destfile = "data/pml-training.csv")
+}
+
+if (!file.exists("data/pml-testing.csv")) {
+    fileUrl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+    download.file(fileUrl, destfile = "data/pml-testing.csv")
+}
 ```
 
-## Including Plots
+## Load, explore and clean the training data
 
-You can also embed plots, for example:
+To start with let's look for columns that are unlikely to be predictors, eg, a record ID, or the name of the participant. These can be removed from the data to be used in training the model.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r load-training-data}
+data.training <-
+    read.csv(
+        "data/pml-training.csv",
+        stringsAsFactors = FALSE,
+        na.strings = c("#DIV/0!", "NA", "")
+    )
+
+# Classe (how well the activity was performed) should be a factor
+data.training$classe <- factor(data.training$classe)
+
+names(data.training)
+data.training %>%
+    select(X:num_window) %>%
+    head
+
+subset.data.training <- data.training %>%
+    select(-(X:num_window))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+Next, let's look at missing data. There seem to be columns where either all or the vast majority of the rows are NAs. The following confirms this, and removes those columns since imputing from the small number of rows with data isn't likely to yield much of value.
+
+```{r remove-na-columns}
+subset.data.training %>%
+    summarize_all(funs(sum(is.na(.)) / n())) %>%
+    select_if(function(col) col > 0)
+
+not_mostly_na <- function(x) {
+    sum(is.na(x)) == 0
+}
+
+subset.data.training <- subset.data.training %>%
+    select_if(not_mostly_na)
+```
+
+Let's take another look at the data to confirm things look better now and check for highly correlated predictors.
+
+```{r final-data-check}
+summary(subset.data.training)
+
+z <- cor(subset.data.training[, -53])
+# This will leave duplicates (eg, X, Y will also show as Y, X)
+as.tibble(as.table(z)) %>%
+    filter(Var1 != Var2) %>%
+    arrange(desc(n)) %>%
+    filter(n > 0.8)
+```
+
+So there are definitely some highly (linearly) correlated predictors. For now, I'm going to ignore those but it should be noted that any model could probably be created with a more parsimonious set of predictors.
+
+## Selecting a model
+
+This is a classification problem. There are three models I'd like to try:
+
+1. k-nearest neighbors (k-NN)
+1. Decision tree
+1. Random forest
+
+There are other models that could be considered, eg, a neural network, but let's see how well the above three do.
+
+For every model I plan to use ten-fold cross validation. For model evaluation, I plan on using accuracy as the critical metric.
+
+### k-NN
+
+Starting with k-NN, the summary of the data above shows a wide range of values for different predictors. As k-NN uses distance between predictors I'm centering and scaling the predictors so they are consistent. I'm going to consider k set from 1 to 10 inclusive to see what works best; potentially will need to consider larger values of k in a second iteration.
+
+```{r knn}
+set.seed(123)
+trControl <- trainControl(method = "cv", number = 10)
+modelFit.knn <-
+    train(
+        classe ~ .,
+        data = subset.data.training,
+        method = "knn",
+        tuneGrid = expand.grid(k = 1:10),
+        trControl = trControl,
+        preProcess = c("center", "scale")
+    )
+
+modelFit.knn
+plot(modelFit.knn)
+confusionMatrix(subset.data.training$classe,
+                predict(modelFit.knn, subset.data.training))
+```
+
+The best model has k = 1 and an accuracy of ~ 0.9940. This predicts the entire training data set perfectly, albeit with the risk of the model being overfit.
+
+### Decision tree
+
+```{r decision-tree}
+set.seed(123)
+modelFit.rpart <-
+    train(classe ~ .,
+          data = subset.data.training,
+          method = "rpart",
+          trControl = trControl)
+
+modelFit.rpart
+plot(modelFit.rpart$finalModel, uniform = TRUE,
+     main = "Classification Tree")
+text(modelFit.rpart$finalModel,
+     use.n = TRUE,
+     all = TRUE,
+     cex = .8)
+confusionMatrix(subset.data.training$classe,
+                predict(modelFit.rpart, subset.data.training))
+```
+
+The decision tree does poorly. It never predicts a classe of D and has an accuracy of ~ 0.5057.
+
+### Random forest
+
+```{r random-forest}
+set.seed(123)
+modelFit.rf <-
+    train(classe ~ .,
+          data = subset.data.training,
+          method = "rf",
+          trControl = trControl)
+
+modelFit.rf
+plot(modelFit.rf)
+plot(modelFit.rf$finalModel)
+confusionMatrix(subset.data.training$classe,
+                predict(modelFit.rf, subset.data.training))
+```
+
+Random forest does better than k-NN. Accuracy is 0.9955 and it also predicts the entire training set perfectly.
+
+## Selecting a model for prediction
+
+I stated above that accuracy would be the metric used for selecting a model. On this basis, the random forest model does best. There's no real benefit between the two contenders in terms of interpretability, neither being particularly interpretable, but that's not really a major driver here (ie, pass the prediction test :-)).
+
+Using the random forest model did result in 100% on the prediction test.
+
+For reference, the testing data needs to be cleaned in the same way as the training data was.
+
+```{r get-testing-data}
+data.testing <-
+    read.csv(
+        "data/pml-testing.csv",
+        stringsAsFactors = FALSE,
+        na.strings = c("#DIV/0!", "NA", "")
+    )
+
+subset.data.testing <- data.testing %>%
+    select(-(X:num_window))
+
+subset.data.testing <- subset.data.testing %>%
+    select_if(not_mostly_na)
+
+#predict(modelFit.rf, subset.data.testing[, -53])
+```
+
+## Further progress
+
+Potential next steps are:
+
+1. Find a more parsimonious set of predictors to use in modeling and prediction.
+2. Try some other models, eg, a neural net. This is probably of lesser importance given the accuracy achieved, but may make for an interesting comparison.
